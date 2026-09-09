@@ -1,0 +1,121 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum AppointmentStatus {
+  CONFIRMED
+  CANCELLED_CLIENT
+  CANCELLED_ADMIN
+  COMPLETED
+  NO_SHOW
+}
+
+enum NotificationChannel {
+  WHATSAPP
+  SMS
+}
+
+enum NotificationStatus {
+  SENT
+  FAILED
+  PENDING
+}
+
+model AdminUser {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("admin_users")
+}
+
+model Barber {
+  id             String          @id @default(uuid())
+  name           String
+  phone          String?
+  avatarUrl      String?
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  
+  appointments   Appointment[]
+  workingHours   WorkingHour[]
+  scheduleBlocks ScheduleBlock[]
+
+  @@map("barbers")
+}
+
+model WorkingHour {
+  id        String   @id @default(uuid())
+  barberId  String
+  dayOfWeek Int      // 0 = Domingo, 1 = Lunes, ..., 6 = Sábado
+  startHour Int      // Ej. 10 (10:00)
+  endHour   Int      // Ej. 19 (19:00)
+  isActive  Boolean  @default(true)
+  
+  barber    Barber   @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+  @@unique([barberId, dayOfWeek])
+  @@map("working_hours")
+}
+
+model ScheduleBlock {
+  id        String    @id @default(uuid())
+  barberId  String
+  date      DateTime  @db.Date
+  startTime String?   // "14:00" o null si es todo el día
+  reason    String?
+  isFullDay Boolean   @default(false)
+  createdAt DateTime  @default(now())
+
+  barber    Barber    @relation(fields: [barberId], references: [id], onDelete: Cascade)
+
+  @@map("schedule_blocks")
+}
+
+model Appointment {
+  id            String            @id @default(uuid())
+  code          String            @unique // Ej. "BR-9481"
+  barberId      String
+  clientName    String
+  clientPhone   String
+  clientEmail   String?
+  date          DateTime          @db.Date
+  startTime     String            // "10:00" (hora fija en punto)
+  endTime       String            // "11:00" (45 min atención + 15 min buffer)
+  status        AppointmentStatus @default(CONFIRMED)
+  cancelReason  String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  barber        Barber            @relation(fields: [barberId], references: [id])
+  notifications NotificationLog[]
+
+  @@index([barberId, date])
+  @@index([clientPhone])
+  @@map("appointments")
+}
+
+model NotificationLog {
+  id            String              @id @default(uuid())
+  appointmentId String
+  channel       NotificationChannel
+  recipient     String
+  messageBody   String
+  status        NotificationStatus  @default(PENDING)
+  externalId    String?
+  errorDetails  String?
+  createdAt     DateTime            @default(now())
+
+  appointment   Appointment         @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@map("notification_logs")
+}
