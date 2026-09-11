@@ -177,6 +177,52 @@ export class AdminService {
   }
 
   async createScheduleBlock(dto: CreateScheduleBlockDto) {
+    const date = this.parseDate(dto.date);
+
+    // Caso 1: Bloquear para TODOS los barberos activos (ej. Feriado o Cierre de local)
+    if (dto.barberId === 'ALL') {
+      const activeBarbers = await this.prisma.barber.findMany({
+        where: { isActive: true },
+      });
+
+      if (activeBarbers.length === 0) {
+        throw new NotFoundException('No hay barberos activos registrados en el sistema.');
+      }
+
+      const createdBlocks = [];
+      for (const barber of activeBarbers) {
+        const existing = await this.prisma.scheduleBlock.findFirst({
+          where: {
+            barberId: barber.id,
+            date,
+            isFullDay: dto.isFullDay,
+            startTime: dto.isFullDay ? null : dto.startTime,
+          },
+        });
+
+        if (!existing) {
+          const block = await this.prisma.scheduleBlock.create({
+            data: {
+              barberId: barber.id,
+              date,
+              isFullDay: dto.isFullDay,
+              startTime: dto.isFullDay ? null : dto.startTime,
+              reason: dto.reason ? dto.reason.trim() : null,
+            },
+          });
+          createdBlocks.push(block);
+        }
+      }
+
+      return {
+        success: true,
+        count: createdBlocks.length,
+        message: `Bloqueo aplicado a ${createdBlocks.length} barberos exitosamente.`,
+        blocks: createdBlocks,
+      };
+    }
+
+    // Caso 2: Bloquear para un barbero específico
     const barber = await this.prisma.barber.findUnique({
       where: { id: dto.barberId },
     });
@@ -184,8 +230,6 @@ export class AdminService {
     if (!barber) {
       throw new NotFoundException(`Barbero con ID ${dto.barberId} no encontrado.`);
     }
-
-    const date = this.parseDate(dto.date);
 
     // Validar si ya existe un bloqueo idéntico
     const existing = await this.prisma.scheduleBlock.findFirst({

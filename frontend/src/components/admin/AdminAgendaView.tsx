@@ -203,17 +203,29 @@ export const AdminAgendaView: FC<AdminAgendaViewProps> = ({ token }) => {
               </select>
             </div>
 
-            {/* Botón Bloquear */}
+            {/* Botones Bloquear */}
+            <button
+              type="button"
+              onClick={() => {
+                setBlockPreFill({ barberId: 'ALL' });
+                setCreateBlockModalOpen(true);
+              }}
+              className="px-3.5 py-2 bg-red-950/80 hover:bg-red-900/80 text-red-300 border border-red-800/80 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md"
+            >
+              <PlusCircle className="w-4 h-4 text-red-400" />
+              <span>Cerrar Día Completo (Todos)</span>
+            </button>
+
             <button
               type="button"
               onClick={() => {
                 setBlockPreFill({});
                 setCreateBlockModalOpen(true);
               }}
-              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-lg shadow-amber-600/20 transition-all"
+              className="px-3.5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-lg shadow-amber-600/20 transition-all"
             >
               <PlusCircle className="w-4 h-4" />
-              <span>Bloquear Horario / Día</span>
+              <span>Bloquear Horario</span>
             </button>
           </div>
         </div>

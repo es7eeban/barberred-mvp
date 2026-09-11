@@ -9,7 +9,7 @@ import {
 } from 'class-validator';
 
 export class CreateScheduleBlockDto {
-  @IsUUID('4', { message: 'El ID del barbero debe ser un UUID válido.' })
+  @IsString({ message: 'El ID del barbero debe ser un UUID o "ALL".' })
   @IsNotEmpty({ message: 'El ID del barbero es requerido.' })
   barberId: string;
 

@@ -1,7 +1,7 @@
 import { useState, useEffect, type FC, type FormEvent } from 'react';
 import type { Barber } from '../../types/index.js';
 import { DatePicker } from '../booking/DatePicker.js';
-import { X, ShieldAlert, Loader2 } from 'lucide-react';
+import { X, ShieldAlert, Loader2, Users, Sparkles } from 'lucide-react';
 
 interface CreateBlockModalProps {
   barbers: Barber[];
@@ -24,27 +24,29 @@ export const CreateBlockModal: FC<CreateBlockModalProps> = ({
   onClose,
   onSuccess,
 }) => {
-  const [barberId, setBarberId] = useState(defaultBarberId || '');
+  const [barberId, setBarberId] = useState(defaultBarberId || 'ALL');
   const [date, setDate] = useState(defaultDate || new Date().toISOString().split('T')[0]);
   const [isFullDay, setIsFullDay] = useState(!defaultStartTime);
   const [startTime, setStartTime] = useState(defaultStartTime || '14:00');
-  const [reason, setReason] = useState('Almuerzo / Descanso');
+  const [reason, setReason] = useState('Feriado / Cierre de local');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      if (defaultBarberId) setBarberId(defaultBarberId);
-      else if (barbers.length > 0) setBarberId(barbers[0].id);
-
+      setBarberId(defaultBarberId || 'ALL');
       if (defaultDate) setDate(defaultDate);
       if (defaultStartTime) {
         setStartTime(defaultStartTime);
         setIsFullDay(false);
+        setReason('Almuerzo / Descanso');
+      } else {
+        setIsFullDay(true);
+        setReason('Feriado / Cierre de local');
       }
       setError(null);
     }
-  }, [isOpen, defaultBarberId, defaultDate, defaultStartTime, barbers]);
+  }, [isOpen, defaultBarberId, defaultDate, defaultStartTime]);
 
   if (!isOpen) return null;
 
@@ -59,6 +61,14 @@ export const CreateBlockModal: FC<CreateBlockModalProps> = ({
     '17:00',
     '18:00',
     '19:00',
+  ];
+
+  const quickReasons = [
+    'Feriado / Cierre de local',
+    'Almuerzo / Descanso',
+    'Mantención del local',
+    'Capacitación de staff',
+    'Trámite o urgencia personal',
   ];
 
   const handleSubmit = async (e: FormEvent) => {
@@ -121,20 +131,35 @@ export const CreateBlockModal: FC<CreateBlockModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Barbero */}
+          {/* Selección de Barbero con opción 'ALL' */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Barbero *</label>
+            <label className="block text-xs font-semibold text-slate-300 mb-1">
+              ¿A quién aplica el bloqueo? *
+            </label>
             <select
               value={barberId}
               onChange={(e) => setBarberId(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-red-500"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white font-semibold focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500"
             >
+              <option value="ALL" className="font-bold text-amber-400 bg-slate-900">
+                ⭐ TODOS LOS BARBEROS (Cierre general / Feriado)
+              </option>
               {barbers.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
+                <option key={b.id} value={b.id} className="bg-slate-950 text-white">
+                  Solo {b.name}
                 </option>
               ))}
             </select>
+
+            {barberId === 'ALL' && (
+              <div className="mt-2 p-2.5 rounded-xl bg-amber-950/30 border border-amber-800/40 text-[11px] text-amber-300/90 flex items-start gap-2">
+                <Users className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <span>
+                  <strong>Bloqueo masivo:</strong> Este bloqueo se aplicará automáticamente a{' '}
+                  <strong className="text-white">todos los barberos activos</strong> al mismo tiempo.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Fecha */}
@@ -144,28 +169,29 @@ export const CreateBlockModal: FC<CreateBlockModalProps> = ({
           </div>
 
           {/* Tipo de Bloqueo */}
-          <div className="p-3 bg-slate-950 rounded-2xl border border-slate-800 space-y-2 text-xs">
-            <label className="font-semibold text-slate-300 block">Tipo de Bloqueo:</label>
-            <div className="flex gap-4">
-              <label className="flex items-center gap-2 cursor-pointer text-slate-200">
-                <input
-                  type="radio"
-                  name="blockType"
-                  checked={!isFullDay}
-                  onChange={() => setIsFullDay(false)}
-                  className="accent-red-600"
-                />
-                <span>Franja horaria puntual (1 hora)</span>
-              </label>
+          <div className="p-3.5 bg-slate-950 rounded-2xl border border-slate-800 space-y-2 text-xs">
+            <label className="font-semibold text-slate-300 block">Alcance del bloqueo:</label>
+            <div className="flex flex-col sm:flex-row gap-3">
               <label className="flex items-center gap-2 cursor-pointer text-slate-200">
                 <input
                   type="radio"
                   name="blockType"
                   checked={isFullDay}
                   onChange={() => setIsFullDay(true)}
-                  className="accent-red-600"
+                  className="accent-amber-600"
                 />
-                <span>Día completo (Feriado/Ausencia)</span>
+                <span className="font-bold">Día completo (Feriado / Sin atención)</span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-slate-200">
+                <input
+                  type="radio"
+                  name="blockType"
+                  checked={!isFullDay}
+                  onChange={() => setIsFullDay(false)}
+                  className="accent-amber-600"
+                />
+                <span>Franja puntual (1 hora)</span>
               </label>
             </div>
           </div>
@@ -178,7 +204,7 @@ export const CreateBlockModal: FC<CreateBlockModalProps> = ({
               <select
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-red-500"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
               >
                 {hoursOptions.map((h) => (
                   <option key={h} value={h}>
@@ -189,21 +215,38 @@ export const CreateBlockModal: FC<CreateBlockModalProps> = ({
             </div>
           )}
 
-          {/* Motivo */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Motivo o Etiqueta (opcional):
+          {/* Motivo con sugerencias rápidas */}
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-slate-300">
+              Motivo o Etiqueta visible:
             </label>
             <input
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Ej. Almuerzo, Trámite personal, Feriado"
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-red-500"
+              placeholder="Ej. Feriado Nacional / Cierre de Local"
+              className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
             />
+
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {quickReasons.map((qr) => (
+                <button
+                  key={qr}
+                  type="button"
+                  onClick={() => setReason(qr)}
+                  className={`text-[10px] px-2 py-0.5 rounded-lg border transition-colors ${
+                    reason === qr
+                      ? 'bg-amber-950 text-amber-300 border-amber-700'
+                      : 'bg-slate-950/60 text-slate-400 border-slate-800 hover:text-slate-200'
+                  }`}
+                >
+                  {qr}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-3 border-t border-slate-800">
             <button
               type="button"
               onClick={onClose}
@@ -219,10 +262,17 @@ export const CreateBlockModal: FC<CreateBlockModalProps> = ({
               {loading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Guardando...</span>
+                  <span>Aplicando bloqueo...</span>
                 </>
               ) : (
-                <span>Aplicar Bloqueo</span>
+                <>
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>
+                    {barberId === 'ALL'
+                      ? 'Bloquear para Todos los Barberos'
+                      : 'Aplicar Bloqueo'}
+                  </span>
+                </>
               )}
             </button>
           </div>
