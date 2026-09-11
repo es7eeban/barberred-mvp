@@ -1,16 +1,61 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BookingFlow } from './components/booking/BookingFlow.js';
 import { MyAppointments } from './components/appointments/MyAppointments.js';
-import { Scissors, Calendar, UserCheck, ShieldCheck } from 'lucide-react';
+import { AdminLogin } from './components/admin/AdminLogin.js';
+import { AdminDashboard } from './components/admin/AdminDashboard.js';
+import type { AdminUser } from './types/index.js';
+import { Scissors, Calendar, UserCheck, ShieldCheck, Lock } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'booking' | 'my-appointments'>('booking');
+  const [activeTab, setActiveTab] = useState<'booking' | 'my-appointments' | 'admin'>('booking');
   const [initialSearchCode, setInitialSearchCode] = useState<string | null>(null);
+
+  // Estado de autenticación del Administrador
+  const [adminToken, setAdminToken] = useState<string | null>(() => {
+    return localStorage.getItem('barberred_admin_token');
+  });
+  const [adminUser, setAdminUser] = useState<AdminUser | null>(() => {
+    const cached = localStorage.getItem('barberred_admin_user');
+    return cached ? JSON.parse(cached) : null;
+  });
+
+  const handleLoginSuccess = (token: string, user: AdminUser) => {
+    localStorage.setItem('barberred_admin_token', token);
+    localStorage.setItem('barberred_admin_user', JSON.stringify(user));
+    setAdminToken(token);
+    setAdminUser(user);
+    setActiveTab('admin');
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('barberred_admin_token');
+    localStorage.removeItem('barberred_admin_user');
+    setAdminToken(null);
+    setAdminUser(null);
+    setActiveTab('booking');
+  };
 
   const handleNavigateToMyAppointments = (code: string) => {
     setInitialSearchCode(code);
     setActiveTab('my-appointments');
   };
+
+  // Verificar validez del token al montar si existe
+  useEffect(() => {
+    if (adminToken) {
+      fetch('/api/admin/auth/me', {
+        headers: { Authorization: `Bearer ${adminToken}` },
+      })
+        .then((res) => {
+          if (!res.ok) {
+            handleLogout();
+          }
+        })
+        .catch(() => {
+          // Mantener en caso de desconexión momentánea
+        });
+    }
+  }, [adminToken]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-red-600 selection:text-white font-sans">
@@ -46,20 +91,21 @@ export default function App() {
                 setActiveTab('booking');
                 setInitialSearchCode(null);
               }}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 activeTab === 'booking'
                   ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
               }`}
             >
               <Calendar className="w-3.5 h-3.5" />
-              <span>Agendar Hora</span>
+              <span className="hidden sm:inline">Agendar Hora</span>
+              <span className="sm:hidden">Agendar</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('my-appointments')}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${
                 activeTab === 'my-appointments'
                   ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
                   : 'text-slate-400 hover:text-white hover:bg-slate-800/60'
@@ -68,17 +114,49 @@ export default function App() {
               <UserCheck className="w-3.5 h-3.5" />
               <span>Mis Citas</span>
             </button>
+
+            {/* Acceso Administrador */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('admin')}
+              title="Panel de Administración Backoffice"
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                activeTab === 'admin'
+                  ? 'bg-red-600 text-white border-red-500 shadow-md shadow-red-600/30'
+                  : 'text-slate-400 border-slate-800 hover:text-white hover:bg-slate-800/60'
+              }`}
+            >
+              <Lock className="w-3.5 h-3.5 text-red-400" />
+              <span className="hidden md:inline">Backoffice</span>
+            </button>
           </nav>
         </div>
       </header>
 
       {/* Contenido Principal */}
       <main className="flex-1 max-w-5xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        {activeTab === 'booking' ? (
+        {activeTab === 'booking' && (
           <BookingFlow onNavigateToMyAppointments={handleNavigateToMyAppointments} />
-        ) : (
+        )}
+
+        {activeTab === 'my-appointments' && (
           <MyAppointments initialSearchCode={initialSearchCode} />
         )}
+
+        {activeTab === 'admin' &&
+          (adminToken && adminUser ? (
+            <AdminDashboard
+              user={adminUser}
+              token={adminToken}
+              onLogout={handleLogout}
+              onBackToPublic={() => setActiveTab('booking')}
+            />
+          ) : (
+            <AdminLogin
+              onLoginSuccess={handleLoginSuccess}
+              onCancel={() => setActiveTab('booking')}
+            />
+          ))}
       </main>
 
       {/* Pie de Página */}

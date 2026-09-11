@@ -53,3 +53,38 @@ export interface Appointment {
     avatarUrl?: string | null;
   };
 }
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string;
+}
+
+export interface WorkingHour {
+  id: string;
+  barberId: string;
+  dayOfWeek: number;
+  startHour: number;
+  endHour: number;
+  isActive: boolean;
+}
+
+export interface ScheduleBlock {
+  id: string;
+  barberId: string;
+  date: string;
+  startTime: string | null;
+  reason: string | null;
+  isFullDay: boolean;
+  createdAt: string;
+  barber?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface AdminBarber extends Barber {
+  workingHours: WorkingHour[];
+  scheduleBlocks: ScheduleBlock[];
+}
+
