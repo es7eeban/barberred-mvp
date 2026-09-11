@@ -42,7 +42,7 @@ export function generateGoogleCalendarUrl(appointment: Appointment): string {
       `Barbero: ${appointment.barber?.name || 'Asignado'}\n` +
       `Horario: ${appointment.startTime} - ${appointment.endTime}\n` +
       `Cliente: ${appointment.clientName}\n\n` +
-      `Para gestionar tu cita visita: ${window.location.origin}`,
+      `Para gestionar tu cita visita: ${window.location.origin}/mis-citas?code=${appointment.code}`,
   );
   const location = encodeURIComponent('BarberRed Local Principal');
 
@@ -103,7 +103,7 @@ export function getWhatsAppShareUrl(appointment: Appointment): string {
       `📅 *Fecha:* ${dateFormatted}\n` +
       `⏰ *Hora:* ${appointment.startTime} a ${appointment.endTime}\n` +
       `👤 *Cliente:* ${appointment.clientName}\n\n` +
-      `Gestión de citas: ${window.location.origin}`,
+      `Gestión de tu cita: ${window.location.origin}/mis-citas?code=${appointment.code}`,
   );
 
   return `https://wa.me/?text=${text}`;
