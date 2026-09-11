@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module.js';
 import { BarbersModule } from './barbers/barbers.module.js';
 import { AvailabilityModule } from './availability/availability.module.js';
 import { AppointmentsModule } from './appointments/appointments.module.js';
+import { AdminModule } from './admin/admin.module.js';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { AppointmentsModule } from './appointments/appointments.module.js';
     BarbersModule,
     AvailabilityModule,
     AppointmentsModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],
