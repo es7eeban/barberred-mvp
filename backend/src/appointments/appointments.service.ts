@@ -56,113 +56,125 @@ export class AppointmentsService {
     const queryDate = this.parseDate(dto.date);
     const dayOfWeek = queryDate.getUTCDay();
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      // 1. Validar barbero
-      const barber = await tx.barber.findUnique({
-        where: { id: dto.barberId },
-      });
-      if (!barber || !barber.isActive) {
-        throw new NotFoundException('Barbero no encontrado o no disponible.');
-      }
+    try {
+      const created = await this.prisma.$transaction(async (tx) => {
+        // Bloqueo pesimista sobre el barbero (Mutex) para serializar reservas simultáneas
+        await tx.$executeRaw`SELECT 1 FROM barbers WHERE id = ${dto.barberId} FOR UPDATE`;
 
-      // 2. Validar que atienda ese día
-      const schedule = await tx.workingHour.findUnique({
-        where: {
-          barberId_dayOfWeek: {
-            barberId: dto.barberId,
-            dayOfWeek,
+        // 1. Validar barbero
+        const barber = await tx.barber.findUnique({
+          where: { id: dto.barberId },
+        });
+        if (!barber || !barber.isActive) {
+          throw new NotFoundException('Barbero no encontrado o no disponible.');
+        }
+
+        // 2. Validar que atienda ese día
+        const schedule = await tx.workingHour.findUnique({
+          where: {
+            barberId_dayOfWeek: {
+              barberId: dto.barberId,
+              dayOfWeek,
+            },
           },
-        },
-      });
-      if (!schedule || !schedule.isActive) {
-        throw new BadRequestException('El barbero no atiende en el día seleccionado.');
-      }
+        });
+        if (!schedule || !schedule.isActive) {
+          throw new BadRequestException('El barbero no atiende en el día seleccionado.');
+        }
 
-      // 3. Validar horario dentro de la jornada
-      const [hour] = dto.startTime.split(':').map(Number);
-      if (hour < schedule.startHour || hour >= schedule.endHour) {
-        throw new BadRequestException(
-          `La hora seleccionada está fuera del horario de atención (${schedule.startHour}:00 a ${schedule.endHour}:00).`,
+        // 3. Validar horario dentro de la jornada
+        const [hour] = dto.startTime.split(':').map(Number);
+        if (hour < schedule.startHour || hour >= schedule.endHour) {
+          throw new BadRequestException(
+            `La hora seleccionada está fuera del horario de atención (${schedule.startHour}:00 a ${schedule.endHour}:00).`,
+          );
+        }
+
+        // 4. Validar que no sea una hora pasada si es hoy
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        if (dto.date === todayStr && hour <= now.getHours()) {
+          throw new BadRequestException('No es posible agendar en horarios pasados.');
+        }
+
+        // 5. Validar bloqueos administrativos
+        const block = await tx.scheduleBlock.findFirst({
+          where: {
+            barberId: dto.barberId,
+            date: queryDate,
+            OR: [{ isFullDay: true }, { startTime: dto.startTime }],
+          },
+        });
+        if (block) {
+          throw new ConflictException('Este horario o día se encuentra bloqueado por la administración.');
+        }
+
+        // 6. Validar colisión con otra cita confirmada (control de concurrencia atómico)
+        const existing = await tx.appointment.findFirst({
+          where: {
+            barberId: dto.barberId,
+            date: queryDate,
+            startTime: dto.startTime,
+            status: AppointmentStatus.CONFIRMED,
+          },
+        });
+        if (existing) {
+          throw new ConflictException(
+            'El horario seleccionado acaba de ser reservado por otro cliente. Por favor elige otra hora.',
+          );
+        }
+
+        // 7. Generar código único
+        let code = this.generateCode();
+        let codeExists = await tx.appointment.findUnique({ where: { code } });
+        while (codeExists) {
+          code = this.generateCode();
+          codeExists = await tx.appointment.findUnique({ where: { code } });
+        }
+
+        // 8. Crear la reserva
+        return tx.appointment.create({
+          data: {
+            code,
+            barberId: dto.barberId,
+            date: queryDate,
+            startTime: dto.startTime,
+            endTime: this.calculateEndTime(dto.startTime),
+            clientName: dto.clientName.trim(),
+            clientPhone: dto.clientPhone.trim(),
+            clientEmail: dto.clientEmail ? dto.clientEmail.trim() : null,
+            status: AppointmentStatus.CONFIRMED,
+          },
+          include: {
+            barber: {
+              select: {
+                name: true,
+                phone: true,
+                avatarUrl: true,
+              },
+            },
+          },
+        });
+      });
+
+      // Despacho asíncrono en segundo plano
+      this.notificationsService
+        .sendBookingConfirmation(created)
+        .catch((err) =>
+          this.logger.error(
+            `Error despachando notificación de reserva ${created.code}: ${err.message}`,
+          ),
         );
-      }
 
-      // 4. Validar que no sea una hora pasada si es hoy
-      const now = new Date();
-      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      if (dto.date === todayStr && hour <= now.getHours()) {
-        throw new BadRequestException('No es posible agendar en horarios pasados.');
-      }
-
-      // 5. Validar bloqueos administrativos
-      const block = await tx.scheduleBlock.findFirst({
-        where: {
-          barberId: dto.barberId,
-          date: queryDate,
-          OR: [{ isFullDay: true }, { startTime: dto.startTime }],
-        },
-      });
-      if (block) {
-        throw new ConflictException('Este horario o día se encuentra bloqueado por la administración.');
-      }
-
-      // 6. Validar colisión con otra cita confirmada (control de concurrencia atómico)
-      const existing = await tx.appointment.findFirst({
-        where: {
-          barberId: dto.barberId,
-          date: queryDate,
-          startTime: dto.startTime,
-          status: AppointmentStatus.CONFIRMED,
-        },
-      });
-      if (existing) {
+      return created;
+    } catch (err: any) {
+      if (err.code === 'P2002') {
         throw new ConflictException(
           'El horario seleccionado acaba de ser reservado por otro cliente. Por favor elige otra hora.',
         );
       }
-
-      // 7. Generar código único
-      let code = this.generateCode();
-      let codeExists = await tx.appointment.findUnique({ where: { code } });
-      while (codeExists) {
-        code = this.generateCode();
-        codeExists = await tx.appointment.findUnique({ where: { code } });
-      }
-
-      // 8. Crear la reserva
-      return tx.appointment.create({
-        data: {
-          code,
-          barberId: dto.barberId,
-          date: queryDate,
-          startTime: dto.startTime,
-          endTime: this.calculateEndTime(dto.startTime),
-          clientName: dto.clientName.trim(),
-          clientPhone: dto.clientPhone.trim(),
-          clientEmail: dto.clientEmail ? dto.clientEmail.trim() : null,
-          status: AppointmentStatus.CONFIRMED,
-        },
-        include: {
-          barber: {
-            select: {
-              name: true,
-              phone: true,
-              avatarUrl: true,
-            },
-          },
-        },
-      });
-    });
-
-    // Despacho asíncrono en segundo plano
-    this.notificationsService
-      .sendBookingConfirmation(created)
-      .catch((err) =>
-        this.logger.error(
-          `Error despachando notificación de reserva ${created.code}: ${err.message}`,
-        ),
-      );
-
-    return created;
+      throw err;
+    }
   }
 
   async findByCode(code: string) {
@@ -223,6 +235,9 @@ export class AppointmentsService {
     const newDayOfWeek = newQueryDate.getUTCDay();
 
     const updated = await this.prisma.$transaction(async (tx) => {
+      // Bloqueo pesimista sobre el barbero (Mutex) para serializar cambios simultáneos
+      await tx.$executeRaw`SELECT 1 FROM barbers WHERE id = ${appointment.barberId} FOR UPDATE`;
+
       // Validar jornada del barbero en la nueva fecha
       const schedule = await tx.workingHour.findUnique({
         where: {

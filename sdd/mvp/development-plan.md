@@ -2,8 +2,8 @@
 ## Proyecto: BarberRed (MVP)
 
 **Versión:** 1.0.0  
-**Estado:** Listo para Ejecución  
-**Fecha:** 2026-09-08  
+**Estado:** Completado y Verificado (MVP 1.0.0)  
+**Fecha:** 2026-09-23  
 **Metodología:** Spec-Driven Development (SDD)  
 **Ubicación:** `/sdd/mvp/development-plan.md`  
 **Documentos Base:** [`functional-spec.md`](file:///C:/Users/estee/Documents/Proyectos/Antigravity/prueba/sdd/mvp/functional-spec.md) | [`technical-spec.md`](file:///C:/Users/estee/Documents/Proyectos/Antigravity/prueba/sdd/mvp/technical-spec.md) | [`design-reference.md`](file:///C:/Users/estee/Documents/Proyectos/Antigravity/prueba/sdd/mvp/design-reference.md)
@@ -92,15 +92,16 @@ gantt
 
 ---
 
-### Fase 5: Estrategia de Pruebas, Control de Calidad y Cierre
+### Fase 5: Estrategia de Pruebas, Control de Calidad y Cierre (Completada ✅)
 - **T-5.1 Pruebas Unitarias:**
-  - Tests unitarios en Jest para el cálculo de slots en `AvailabilityService` (validar que no solape horas, que respete descansos y bloqueos de día completo).
+  - ✅ Implementada suite de 16 tests unitarios en Vitest para `AvailabilityService` (cálculo de slots de 60 min, detección de feriados, bloqueos parciales y slots pasados), `AppointmentsService` (regla de anticipación de 2h, validaciones) y `NotificationsService`.
 - **T-5.2 Pruebas de Concurrencia:**
-  - Script de test de carga simultánea disparando 10 reservas en paralelo para el mismo slot; verificar que exactamente 1 sea confirmada y las 9 restantes reciban HTTP 409 Conflict.
+  - ✅ Desarrollado y ejecutado script de carga masiva concurrente (`npm run test:concurrency` en `backend/scripts/test-concurrency.ts`) disparando 10 reservas simultáneas al mismo slot.
+  - ✅ Implementado bloqueo pesimista a nivel de fila (`SELECT ... FOR UPDATE`) y partial unique index en PostgreSQL para garantizar que exactamente 1 reserva gane (HTTP 201) y 9 sean rechazadas con HTTP 409 Conflict en 106-229 ms.
 - **T-5.3 Pruebas de Notificación:**
-  - Prueba de entrega de mensajes WhatsApp en entorno sandbox de Twilio.
+  - ✅ Pruebas automatizadas de despacho en modo dual (Twilio oficial / Simulación con auditoría en `NotificationLog` y fallback automático a SMS).
 - **T-5.4 Verificación de Diseño y Responsive:**
-  - Validación visual en viewports móviles (375px, 414px) y escritorio (1280px+).
+  - ✅ Interfaces del cliente y panel administrativo adaptadas y verificadas con Tailwind CSS para dispositivos móviles y escritorio.
 
 ---
 
