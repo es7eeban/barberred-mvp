@@ -4,6 +4,7 @@ import {
   NotFoundException,
   BadRequestException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { JwtService } from '@nestjs/jwt';
@@ -13,12 +14,16 @@ import { LoginDto } from './dto/login.dto.js';
 import { AdminCancelAppointmentDto } from './dto/admin-cancel-appointment.dto.js';
 import { CreateScheduleBlockDto } from './dto/create-schedule-block.dto.js';
 import { UpdateWorkingHoursDto } from './dto/update-working-hours.dto.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   private parseDate(dateStr: string): Date {
@@ -119,7 +124,20 @@ export class AdminService {
       },
     });
 
+    // Despacho asíncrono en segundo plano
+    this.notificationsService
+      .sendAdminCancellation(updated as any, dto.reason.trim())
+      .catch((err) =>
+        this.logger.error(
+          `Error despachando notificación de cancelación administrativa para la cita ${id}: ${err.message}`,
+        ),
+      );
+
     return updated;
+  }
+
+  async getNotificationLogs() {
+    return this.notificationsService.getAuditLogs();
   }
 
   async getBarbers() {

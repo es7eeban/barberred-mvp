@@ -6,10 +6,12 @@ import { AdminController } from './admin.controller.js';
 import { AdminService } from './admin.service.js';
 import { JwtStrategy } from './jwt.strategy.js';
 import { PrismaModule } from '../prisma/prisma.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 
 @Module({
   imports: [
     PrismaModule,
+    NotificationsModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({
       imports: [ConfigModule],

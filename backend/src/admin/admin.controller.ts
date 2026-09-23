@@ -78,4 +78,11 @@ export class AdminController {
   async deleteScheduleBlock(@Param('id') id: string) {
     return this.adminService.deleteScheduleBlock(id);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('notifications')
+  async getNotifications() {
+    return this.adminService.getNotificationLogs();
+  }
 }
+

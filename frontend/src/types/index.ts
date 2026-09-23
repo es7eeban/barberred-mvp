@@ -88,3 +88,27 @@ export interface AdminBarber extends Barber {
   scheduleBlocks: ScheduleBlock[];
 }
 
+export type NotificationChannel = 'WHATSAPP' | 'SMS';
+export type NotificationStatus = 'SENT' | 'FAILED' | 'PENDING';
+
+export interface NotificationLog {
+  id: string;
+  appointmentId: string;
+  channel: NotificationChannel;
+  recipient: string;
+  messageBody: string;
+  status: NotificationStatus;
+  externalId: string | null;
+  errorDetails: string | null;
+  createdAt: string;
+  appointment?: {
+    code: string;
+    clientName: string;
+    clientPhone: string;
+    barber: {
+      name: string;
+    };
+  };
+}
+
+

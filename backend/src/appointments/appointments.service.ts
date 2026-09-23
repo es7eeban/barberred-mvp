@@ -3,16 +3,23 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AppointmentStatus } from '@prisma/client';
 import { CreateAppointmentDto } from './dto/create-appointment.dto.js';
 import { RescheduleAppointmentDto } from './dto/reschedule-appointment.dto.js';
 import { CancelAppointmentDto } from './dto/cancel-appointment.dto.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 
 @Injectable()
 export class AppointmentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(AppointmentsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notificationsService: NotificationsService,
+  ) {}
 
   private calculateEndTime(startTime: string): string {
     const [hour] = startTime.split(':').map(Number);
@@ -49,7 +56,7 @@ export class AppointmentsService {
     const queryDate = this.parseDate(dto.date);
     const dayOfWeek = queryDate.getUTCDay();
 
-    return this.prisma.$transaction(async (tx) => {
+    const created = await this.prisma.$transaction(async (tx) => {
       // 1. Validar barbero
       const barber = await tx.barber.findUnique({
         where: { id: dto.barberId },
@@ -145,6 +152,17 @@ export class AppointmentsService {
         },
       });
     });
+
+    // Despacho asíncrono en segundo plano
+    this.notificationsService
+      .sendBookingConfirmation(created)
+      .catch((err) =>
+        this.logger.error(
+          `Error despachando notificación de reserva ${created.code}: ${err.message}`,
+        ),
+      );
+
+    return created;
   }
 
   async findByCode(code: string) {
@@ -204,7 +222,7 @@ export class AppointmentsService {
     const newQueryDate = this.parseDate(dto.newDate);
     const newDayOfWeek = newQueryDate.getUTCDay();
 
-    return this.prisma.$transaction(async (tx) => {
+    const updated = await this.prisma.$transaction(async (tx) => {
       // Validar jornada del barbero en la nueva fecha
       const schedule = await tx.workingHour.findUnique({
         where: {
@@ -251,6 +269,17 @@ export class AppointmentsService {
         },
       });
     });
+
+    // Despacho asíncrono en segundo plano
+    this.notificationsService
+      .sendRescheduleConfirmation(updated)
+      .catch((err) =>
+        this.logger.error(
+          `Error despachando notificación de reprogramación ${updated.code}: ${err.message}`,
+        ),
+      );
+
+    return updated;
   }
 
   async cancel(code: string, dto: CancelAppointmentDto) {
@@ -269,7 +298,24 @@ export class AppointmentsService {
         status: AppointmentStatus.CANCELLED_CLIENT,
         cancelReason: dto.reason || 'Cancelada voluntariamente por el cliente.',
       },
+      include: {
+        barber: {
+          select: {
+            name: true,
+            phone: true,
+          },
+        },
+      },
     });
+
+    // Despacho asíncrono en segundo plano
+    this.notificationsService
+      .sendClientCancellation(updated as any)
+      .catch((err) =>
+        this.logger.error(
+          `Error despachando notificación de cancelación ${updated.code}: ${err.message}`,
+        ),
+      );
 
     return {
       success: true,

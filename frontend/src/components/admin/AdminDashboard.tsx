@@ -3,10 +3,12 @@ import type { AdminUser } from '../../types/index.js';
 import { AdminAgendaView } from './AdminAgendaView.js';
 import { AdminScheduleView } from './AdminScheduleView.js';
 import { AdminBarbersView } from './AdminBarbersView.js';
+import { AdminNotificationsView } from './AdminNotificationsView.js';
 import {
   Calendar,
   Clock,
   Users,
+  MessageSquare,
   LogOut,
   ArrowLeft,
 } from 'lucide-react';
@@ -24,7 +26,7 @@ export const AdminDashboard: FC<AdminDashboardProps> = ({
   onLogout,
   onBackToPublic,
 }) => {
-  const [adminTab, setAdminTab] = useState<'agenda' | 'schedule' | 'barbers'>('agenda');
+  const [adminTab, setAdminTab] = useState<'agenda' | 'schedule' | 'barbers' | 'notifications'>('agenda');
 
   return (
     <div className="space-y-6">
@@ -94,6 +96,19 @@ export const AdminDashboard: FC<AdminDashboardProps> = ({
               <Users className="w-3.5 h-3.5" />
               <span>Barberos</span>
             </button>
+
+            <button
+              type="button"
+              onClick={() => setAdminTab('notifications')}
+              className={`px-3 py-1.5 rounded-xl font-semibold transition-all flex items-center gap-1.5 ${
+                adminTab === 'notifications'
+                  ? 'bg-red-600 text-white shadow-md shadow-red-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              <span>Notificaciones</span>
+            </button>
           </div>
 
           <button
@@ -111,6 +126,7 @@ export const AdminDashboard: FC<AdminDashboardProps> = ({
       {adminTab === 'agenda' && <AdminAgendaView token={token} />}
       {adminTab === 'schedule' && <AdminScheduleView token={token} />}
       {adminTab === 'barbers' && <AdminBarbersView token={token} />}
+      {adminTab === 'notifications' && <AdminNotificationsView token={token} />}
     </div>
   );
 };
