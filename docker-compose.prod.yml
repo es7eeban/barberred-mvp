@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  # Base de Datos PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: barberred_db_prod
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: barber_user
+      POSTGRES_PASSWORD: barber_password
+      POSTGRES_DB: barberred_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - barberred_postgres_prod_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U barber_user -d barberred_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - barberred_network
+
+  # API Backend NestJS
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: barberred_backend_prod
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://barber_user:barber_password@postgres:5432/barberred_db?schema=public"
+      PORT: 3000
+      NODE_ENV: production
+      JWT_SECRET: "barberred_production_secure_jwt_key_2026"
+      JWT_EXPIRES_IN: "7d"
+      TWILIO_ACCOUNT_SID: "AC_dummy_account_sid_for_development"
+      TWILIO_AUTH_TOKEN: "dummy_auth_token"
+      TWILIO_WHATSAPP_NUMBER: "whatsapp:+14155238886"
+      TWILIO_SMS_NUMBER: "+14155238886"
+      FRONTEND_URL: "http://localhost"
+    ports:
+      - "3000:3000"
+    networks:
+      - barberred_network
+
+  # Web Frontend React + Nginx
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: barberred_frontend_prod
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - barberred_network
+
+volumes:
+  barberred_postgres_prod_data:
+
+networks:
+  barberred_network:
+    driver: bridge
